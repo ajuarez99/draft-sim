@@ -89,8 +89,10 @@ public record SharePreview(String title, String description, String imageAlt, Ca
                     .append(same).append(" even, ").append(behind).append(" behind.");
         }
 
+        // Spec 078's "#8 · Nov 21" on the picture too, when the day has a number.
+        String dayLine = day == null ? null : dailyNumber != null ? "#" + dailyNumber + " · " + day : day;
         Card card = new Card(BRAND.toUpperCase(Locale.ROOT), headline, champion, record, p.draftScore(), seasonLine,
-                day, s.chosenSeason(), p.marks());
+                dayLine, s.chosenSeason(), p.marks());
         return new SharePreview(title, description, alt.toString(), card);
     }
 

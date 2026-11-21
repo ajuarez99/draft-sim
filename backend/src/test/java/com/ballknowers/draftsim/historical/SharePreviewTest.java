@@ -26,7 +26,7 @@ class SharePreviewTest {
             var season = new HistoricalGameState.SeasonView(label, List.of(), Map.of(), Map.of(), "x", "x", "x",
                     List.of(), null);
             var state = new HistoricalGameState(7L, sport, "COMPLETE", season, teams, 14, List.of(), userSlot,
-                    List.of(), 169, null, false, List.of(), List.of(), result, 0, dailyDate, chosen);
+                    List.of(), 169, null, false, List.of(), List.of(), result, 0, dailyDate, null, chosen);
             return new PublicGame(state, reducedUntil);
         } catch (Exception e) {
             throw new IllegalStateException(e);

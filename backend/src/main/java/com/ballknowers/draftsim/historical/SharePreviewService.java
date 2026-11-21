@@ -39,11 +39,9 @@ public class SharePreviewService {
         this.games = games;
     }
 
-    /**
-     * SEAM(079 -> daily-number/078): the daily number is null until HistoricalGameState carries it on main.
-     */
-    public Optional<SharePreview> preview(long id, Integer dailyNumber) {
-        return games.publicGame(id).map(g -> SharePreview.from(g, dailyNumber));
+    /** The game of the day's number (spec 078) comes from the public state itself: null for free play. */
+    public Optional<SharePreview> preview(long id) {
+        return games.publicGame(id).map(g -> SharePreview.from(g, g.state().dailyNumber()));
     }
 
     /**
@@ -55,7 +53,7 @@ public class SharePreviewService {
             byte[] hit = cache.get(id);
             if (hit != null) return Optional.of(hit);
         }
-        Optional<SharePreview> p = preview(id, null);
+        Optional<SharePreview> p = preview(id);
         if (p.isEmpty()) return Optional.empty();
         boolean got;
         try {

@@ -379,7 +379,9 @@ class RedraftPublicMvcIT {
         for (String n : names) assertFalse(body.contains(n), "a player name reached the preview: " + n);
         assertNoOwner(body);
         JsonNode reduced = json.readTree(body);
-        assertTrue(reduced.get("title").asText().startsWith("Redraft daily"), reduced.get("title").asText());
+        // spec 078 on main: the title carries the day's number ("Redraft daily #8 · Nov 21 · ...")
+        String wantHead = "Redraft daily #" + com.ballknowers.draftsim.historical.DailyNumber.of(today) + " · ";
+        assertTrue(reduced.get("title").asText().startsWith(wantHead), reduced.get("title").asText());
         assertEquals(fullPreview.get("card").get("marks"), reduced.get("card").get("marks"),
                 "the squares are the same whether the game is reduced or full");
         assertEquals(fullPreview.get("card").get("draftScore"), reduced.get("card").get("draftScore"));

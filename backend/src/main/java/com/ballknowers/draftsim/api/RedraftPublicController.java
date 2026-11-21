@@ -98,8 +98,7 @@ public class RedraftPublicController {
      */
     @GetMapping("/games/{id}/preview")
     public ResponseEntity<SharePreview> preview(@PathVariable long id) {
-        // SEAM(079 -> daily-number/078): pass the game's dailyNumber once HistoricalGameState carries it on main
-        return previews.preview(id, null)
+        return previews.preview(id)
                 .map(p -> ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "public, max-age=300").body(p))
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
