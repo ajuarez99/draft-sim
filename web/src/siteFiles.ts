@@ -75,3 +75,11 @@ export function serveConfig(cfg: SiteConfig, headers: unknown): Record<string, u
     headers,
   }
 }
+
+/**
+ * Spec 079: what web/server/server.mjs reads at start (written next to serve.site.json, never inside dist). `apiBase` is the
+ * backend the share-preview words and picture are fetched from (VITE_API_BASE, '' when unset), `origin` this site's own address.
+ */
+export function serverConfig(cfg: SiteConfig, env: { VITE_API_BASE?: string }): { site: string; apiBase: string; origin: string } {
+  return { site: cfg.site, apiBase: (env.VITE_API_BASE ?? '').trim().replace(/\/+$/, ''), origin: siteOrigin(cfg) }
+}

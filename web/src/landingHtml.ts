@@ -6,7 +6,7 @@ import { esc, jsonForScript } from './htmlEscape'
 import { embeddedDataFor, staticBodyFor } from './seasonPageHtml'
 import * as redraft from './redraftCopy'
 import { EMPTY_REDRAFT_DATA, SPORTS, homePageEntry, offeredSportsOf, type RedraftPage } from './redraftPages'
-import { siteOrigin, type SiteConfig } from './site'
+import { redraftImageUrl, siteOrigin, type SiteConfig } from './site'
 import type { RedraftSeasonData } from './api'
 
 // Spec 050: pure string renderers for the HTML a visitor who doesn't run scripts
@@ -160,8 +160,7 @@ export type PageParts = { head: string; body: string; after: string }
 
 /** Head tags for one page of the page list. Indexable pages get the full set; 404.html and the app shell get noindex and no canonical. */
 export function pageHeadTags(page: RedraftPage, cfg: SiteConfig): string {
-  const origin = siteOrigin(cfg)
-  const imageUrl = `${origin}/og-image-tm.png`
+  const imageUrl = redraftImageUrl(cfg)
   const meta = (attr: 'name' | 'property', key: string, value: string | number) =>
     `    <meta ${attr}="${key}" content="${esc(String(value))}" />`
   const lines = [`    <title>${esc(page.title)}</title>`]

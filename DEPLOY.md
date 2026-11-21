@@ -467,6 +467,16 @@ finishes; the files do not follow by themselves.
 
 ### How the web container serves it now
 
+- **Amended 2026-11-21 (spec 079, share preview):** the container no longer runs the `serve` CLI. It runs
+  `node server/server.mjs`, built on the two libraries `serve@14.2.6` itself runs (`serve-handler@6.1.7`,
+  `compression@1.8.1`), with the same `serve.site.json`, so every path below answers as before (measured on 24 paths
+  against the CLI, `specs/079-redraft-share-preview/verification.md`). One addition: on the Redraft site,
+  `GET|HEAD /game/<id>` answers `app-shell.html` with that game's preview tags, from the backend's
+  `GET /api/history/public/games/<id>/preview` (1 s timeout; any failure serves the plain shell). The image is
+  `<VITE_API_BASE>/api/history/public/games/<id>/preview.png?v=1`, rendered by the backend with Java2D. The build also
+  writes `server.site.json` (`{site, apiBase, origin}`) beside `serve.site.json`; the server reads it, not runtime env.
+  Rollback: redeploy the previous web image. **Not yet checked on Railway:** the Docker build, and that the backend
+  image (`eclipse-temurin:21-jre-jammy`) has a font Java2D can draw with (a missing font answers 503 on the PNG only).
 - The Dockerfile runs `serve dist --config ../serve.site.json` with **no `-s`**. The build generates
   `serve.site.json` beside `dist/` (git-ignored, never published) for whichever `VITE_SITE` it built, and it
   carries `web/serve.json`'s security headers. The leagues and combined sites get one `**` rewrite to

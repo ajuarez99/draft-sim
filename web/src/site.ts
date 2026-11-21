@@ -59,6 +59,11 @@ export function siteOrigin(cfg: SiteConfig): string {
   return cfg.site === 'leagues' ? cfg.leaguesOrigin : cfg.tmOrigin
 }
 
+/** The generic Redraft share image (og-image-tm.png on the site's own origin). Spec 079: pageHeadTags and applyPageHead both use it. */
+export function redraftImageUrl(cfg: SiteConfig): string {
+  return `${siteOrigin(cfg)}/og-image-tm.png`
+}
+
 /** The Time Machine home path. The league site has none. */
 export function tmHome(cfg: SiteConfig): string {
   if (cfg.site === 'leagues') throw new Error('tmHome: the league site has no Redraft game')

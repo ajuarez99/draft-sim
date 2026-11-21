@@ -351,6 +351,57 @@ class RedraftPublicMvcIT {
         }
     }
 
+    // ---- the share preview (spec 079) ---------------------------------------------------------------------
+
+    @Test
+    void thePreviewOfTodaysReducedDailyHoldsNoPlayerAndMatchesTheFullGameAfterMidnight() throws Exception {
+        LocalDate today = LocalDate.now(HistoricalDailyService.ZONE);
+        long id = finishedDaily(today.minusDays(1));
+        // every player name of the full game, read while it is full
+        List<String> names = new ArrayList<>();
+        for (JsonNode pick : ok("/api/history/public/games/" + id).get("state").get("picks")) {
+            names.add(pick.get("player").get("name").asText());
+        }
+        assertTrue(names.size() > 100);
+        JsonNode fullPreview = ok("/api/history/public/games/" + id + "/preview");
+
+        jdbc.update("update historical_game set daily_date = ? where id = ?", today, id);
+        MvcResult r = call("/api/history/public/games/" + id + "/preview");
+        assertEquals(200, r.getResponse().getStatus());
+        assertEquals("public, max-age=300", r.getResponse().getHeader("Cache-Control"));
+        String body = r.getResponse().getContentAsString();
+        for (String n : names) assertFalse(body.contains(n), "a player name reached the preview: " + n);
+        assertNoOwner(body);
+        JsonNode reduced = json.readTree(body);
+        assertTrue(reduced.get("title").asText().startsWith("Redraft daily"), reduced.get("title").asText());
+        assertEquals(fullPreview.get("card").get("marks"), reduced.get("card").get("marks"),
+                "the squares are the same whether the game is reduced or full");
+        assertEquals(fullPreview.get("card").get("draftScore"), reduced.get("card").get("draftScore"));
+        assertEquals(fullPreview.get("card").get("record"), reduced.get("card").get("record"));
+        assertEquals(fullPreview.get("card").get("headline"), reduced.get("card").get("headline"));
+    }
+
+    @Test
+    void thePreviewPngIsAPngAndUnknownOrUnfinishedGamesAre404() throws Exception {
+        long done = gameService.create(ALICE, "NBA", 5, HistoricalSyntheticSeason.S).id();
+        long drafting = gameService.create(ALICE, "NBA", 6, HistoricalSyntheticSeason.S).id();
+        gameService.auto(done, HistoricalGameService.Scope.FINISH, ALICE);
+
+        MvcResult png = call("/api/history/public/games/" + done + "/preview.png");
+        assertEquals(200, png.getResponse().getStatus());
+        assertEquals("image/png", png.getResponse().getContentType());
+        assertEquals("public, max-age=86400", png.getResponse().getHeader("Cache-Control"));
+        byte[] bytes = png.getResponse().getContentAsByteArray();
+        assertTrue(bytes.length > 1000 && (bytes[1] == 'P' && bytes[2] == 'N' && bytes[3] == 'G'));
+
+        for (String suffix : new String[]{"/preview", "/preview.png"}) {
+            for (long id : new long[]{drafting, 2_000_000_000L}) {
+                MvcResult r = call("/api/history/public/games/" + id + suffix);
+                assertEquals(404, r.getResponse().getStatus(), id + suffix);
+            }
+        }
+    }
+
     private static void assertNoOwner(String body) {
         assertFalse(body.contains(ALICE), "the owner's id is in the response");
         assertFalse(body.contains("guest:"));

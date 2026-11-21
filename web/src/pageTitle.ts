@@ -1,5 +1,7 @@
 import { useEffect } from 'react'
 import { currentSite } from './siteEnv'
+import { redraftImageUrl } from './site'
+import { imageAlt } from './redraftCopy'
 
 /**
  * What one Redraft page puts in the head once it has mounted. An indexable page passes its RedraftPage entry from
@@ -51,6 +53,13 @@ function setCanonical(href: string | null): void {
 export function applyPageHead(h: PageHead): void {
   document.title = h.title
   upsertMeta('property', 'og:title', h.title)
+  // Spec 079 PR-05: a shared-game load carries that game's picture in these four tags; after a client-side move the page is
+  // no longer that game, so they go back to the site picture. Unfurlers read the delivered HTML, not this.
+  const image = redraftImageUrl(currentSite())
+  upsertMeta('property', 'og:image', image)
+  upsertMeta('name', 'twitter:image', image)
+  upsertMeta('property', 'og:image:alt', imageAlt)
+  upsertMeta('name', 'twitter:image:alt', imageAlt)
   upsertMeta('name', 'twitter:title', h.noindex ? null : h.title)
   if (h.description !== undefined) {
     upsertMeta('name', 'description', h.description)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { makeConfig } from './site'
-import { isSafePageFile, robotsTxt, serveConfig, sitemapXml } from './siteFiles'
+import { isSafePageFile, robotsTxt, serveConfig, serverConfig, sitemapXml } from './siteFiles'
 
 // Spec 073 SC-007 / T005: each site's robots.txt and sitemap.xml name only its own address.
 const TM = 'https://www.ballknowers.co'
@@ -105,4 +105,19 @@ describe('what the build writes (review-fixes B1)', () => {
       expect(isSafePageFile(f)).toBe(false)
     },
   )
+})
+
+describe('serverConfig (spec 079)', () => {
+  it('carries the site, the backend base without a trailing slash, and the site origin', () => {
+    expect(serverConfig(makeConfig({ VITE_SITE: 'timemachine' }), { VITE_API_BASE: 'https://api.ballknowers.co/' })).toEqual({
+      site: 'timemachine',
+      apiBase: 'https://api.ballknowers.co',
+      origin: TM,
+    })
+  })
+
+  it('writes an empty apiBase when VITE_API_BASE is unset, and the leagues origin for the leagues site', () => {
+    expect(serverConfig(makeConfig({}), {})).toEqual({ site: 'combined', apiBase: '', origin: TM })
+    expect(serverConfig(makeConfig({ VITE_SITE: 'leagues' }), {}).origin).toBe('https://leagues.ballknowers.co')
+  })
 })

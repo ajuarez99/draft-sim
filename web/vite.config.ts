@@ -7,7 +7,7 @@ import type { RedraftSeasonData } from './src/api'
 import { pageParts, transform } from './src/landingHtml'
 import { appShellPage, homePageEntry, indexablePages, notFoundPage, type RedraftPage } from './src/redraftPages'
 import { makeConfig, type SiteConfig } from './src/site'
-import { isSafePageFile, robotsTxt, serveConfig, sitemapXml } from './src/siteFiles'
+import { isSafePageFile, robotsTxt, serveConfig, serverConfig, sitemapXml } from './src/siteFiles'
 import { ALLOW_EMPTY_ENV, loadSeasonData } from './scripts/fetchSeasons'
 
 // Spec 050: link-preview bots and most crawlers don't run scripts, so the title, the
@@ -114,6 +114,8 @@ function landingHtml(cfg: SiteConfig, command: 'build' | 'serve', env: Record<st
       // serve.site.json sits NEXT TO dist (not inside it, so it is not published); the Dockerfile copies it.
       const headers = JSON.parse(readFileSync(resolve(resolved.root, 'serve.json'), 'utf8')).headers
       writeFileSync(resolve(outDir, '..', 'serve.site.json'), JSON.stringify(serveConfig(cfg, headers), null, 2) + '\n')
+      // Spec 079: the web server (server/server.mjs) reads which site this is and where the backend lives from this file.
+      writeFileSync(resolve(outDir, '..', 'server.site.json'), JSON.stringify(serverConfig(cfg, env), null, 2) + '\n')
     },
     configureServer(server) {
       const f = files()

@@ -7,10 +7,15 @@ import com.ballknowers.draftsim.historical.HistoricalSport;
 import com.ballknowers.draftsim.historical.HistoricalSports;
 import com.ballknowers.draftsim.historical.PublicGame;
 import com.ballknowers.draftsim.historical.SeasonList;
+import com.ballknowers.draftsim.historical.SharePreview;
+import com.ballknowers.draftsim.historical.SharePreviewBusyException;
+import com.ballknowers.draftsim.historical.SharePreviewRenderException;
+import com.ballknowers.draftsim.historical.SharePreviewService;
 import com.ballknowers.draftsim.historical.SeasonPage;
 import com.ballknowers.draftsim.historical.SeasonSummaryService;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,13 +41,18 @@ import java.util.Optional;
 @RequestMapping("/api/history/public")
 public class RedraftPublicController {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(RedraftPublicController.class);
+
     private final HistoricalSports sports;
     private final SeasonSummaryService summaries;
     private final HistoricalGameService games;
     private final HistoricalDailyService daily;
+    private final SharePreviewService previews;
 
     public RedraftPublicController(HistoricalSports sports, SeasonSummaryService summaries,
-                                   HistoricalGameService games, HistoricalDailyService daily) {
+                                   HistoricalGameService games, HistoricalDailyService daily,
+                                   SharePreviewService previews) {
+        this.previews = previews;
         this.sports = sports;
         this.summaries = summaries;
         this.games = games;
@@ -80,6 +90,33 @@ public class RedraftPublicController {
     public ResponseEntity<PublicGame> game(@PathVariable long id) {
         return games.publicGame(id).map(g -> ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(g))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Spec 079: the words of a shared link's preview card (title, description, alt text, what the picture draws).
+     * Built only from what the public game view keeps, so it holds no player. 404 as {@code /games/{id}}.
+     */
+    @GetMapping("/games/{id}/preview")
+    public ResponseEntity<SharePreview> preview(@PathVariable long id) {
+        // SEAM(079 -> daily-number/078): pass the game's dailyNumber once HistoricalGameState carries it on main
+        return previews.preview(id, null)
+                .map(p -> ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "public, max-age=300").body(p))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    /** Spec 079: the 1200x630 card. 404 as above; 503 when every render slot stays busy or the render fails. */
+    @GetMapping(value = "/games/{id}/preview.png", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> previewPng(@PathVariable long id) {
+        try {
+            return previews.png(id)
+                    .map(b -> ResponseEntity.ok().header(HttpHeaders.CACHE_CONTROL, "public, max-age=86400")
+                            .contentType(MediaType.IMAGE_PNG).body(b))
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (SharePreviewBusyException | SharePreviewRenderException e) {
+            if (!(e instanceof SharePreviewBusyException)) log.warn("share preview render failed for game {}: {}", id, e.toString());
+            return ResponseEntity.status(503).header(HttpHeaders.RETRY_AFTER, "5")
+                    .header(HttpHeaders.CACHE_CONTROL, "no-store").build();
+        }
     }
 
     private HistoricalSport knownSport(String code) {

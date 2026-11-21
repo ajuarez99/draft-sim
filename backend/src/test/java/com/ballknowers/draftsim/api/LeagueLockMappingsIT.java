@@ -72,6 +72,8 @@ class LeagueLockMappingsIT {
             "/api/history/profile/seen",
             "/api/history/public/daily/yesterday",
             "/api/history/public/games/{id}",
+            "/api/history/public/games/{id}/preview",
+            "/api/history/public/games/{id}/preview.png",
             "/api/history/public/seasons",
             "/api/history/public/seasons/{sport}/{slug}",
             "/api/history/seasons",
@@ -187,6 +189,8 @@ class LeagueLockMappingsIT {
                 {"GET", "/api/history/public/seasons/XXX/2016-17", "404"},
                 {"GET", "/api/history/public/daily/yesterday", "200"},
                 {"GET", "/api/history/public/games/2147483000", "404"},
+                {"GET", "/api/history/public/games/2147483000/preview", "404"},
+                {"GET", "/api/history/public/games/2147483000/preview.png", "404"},
                 // the changed history routes: 401 is the ROUTE'S (no identity at all), not the lock's
                 {"GET", "/api/history/games", "401"},
                 {"POST", "/api/history/claim", "400"},
