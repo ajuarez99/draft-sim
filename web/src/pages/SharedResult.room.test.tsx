@@ -219,11 +219,11 @@ describe("the room for somebody else's game", () => {
       pickFinishes: [{ pickNo: 3, mark: 'ahead' }],
     } as unknown as HistoricalResult
     api.getPublicGame.mockResolvedValue(
-      pub({ reducedUntil: '2999-01-02T05:00:00Z' }, { userSlot: 3, picks: [], result: reducedResult, dailyDate: '2999-01-01' }),
+      pub({ reducedUntil: '2999-01-02T05:00:00Z' }, { userSlot: 3, picks: [], result: reducedResult, dailyDate: '2999-01-01', dailyNumber: 99 }),
     )
     renderRoom()
     expect(await screen.findByText("The picks and lineups show tomorrow, once today's game is over.")).toBeInTheDocument()
-    expect(screen.getByText(/Game of the day, Jan 1/)).toBeInTheDocument()
+    expect(screen.getByText(/Game of the day #99, Jan 1/)).toBeInTheDocument() // spec 078
     expect(screen.queryByRole('link', { name: /played out/ })).toBeNull()
     expect(screen.getByText('77')).toBeInTheDocument()
     expect(document.body.textContent).not.toMatch(/\b900\b/)

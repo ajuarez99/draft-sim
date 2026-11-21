@@ -6,7 +6,7 @@ import RedraftFoot from '../components/RedraftFoot'
 import { RedraftWhereTo } from '../components/RedraftNotFound'
 import { useStartDaily } from '../components/DailyCards'
 import { sportOf } from '../historicalCopy'
-import { dayLabel } from '../historicalDaily'
+import { dailyName } from '../historicalDaily'
 import { usePageHead } from '../pageTitle'
 import * as copy from '../redraftCopy'
 import { tmSeason } from '../site'
@@ -80,7 +80,7 @@ export default function SharedResult({ pub, onReducedEnd }: { pub: PublicGame; o
   const reduced = pub.reducedUntil != null
   if (!game.result) return <NoFinishedGame />
   const seasonLink = reduced ? null : tmSeason(currentSite(), sport, game.season.label)
-  const tail = game.dailyDate ? copy.sharedDailyTail(dayLabel(game.dailyDate)) : game.chosenSeason ? copy.sharedChosenTail : null
+  const tail = game.dailyDate ? dailyName(copy.sharedDailyHead, game.dailyDate, game.dailyNumber, ', ') : game.chosenSeason ? copy.sharedChosenTail : null
   return (
     <div className="content tm tm-page tm-results">
       <h1 className="tm-kicker">{copy.sharedKicker(game.season.label, sport, tail)}</h1>

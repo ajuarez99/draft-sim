@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { countdown, dayLabel, landingStats } from './historicalDaily'
+import { countdown, dailyName, dayLabel, landingStats } from './historicalDaily'
+
+describe('dailyName (spec 078)', () => {
+  it('puts the running number between the prefix and the date', () => {
+    expect(dailyName('Daily', '2026-11-21', 8)).toBe('Daily #8 · Nov 21')
+    expect(dailyName('game of the day', '2026-11-21', 8, ', ')).toBe('game of the day #8, Nov 21')
+    expect(dailyName('', '2026-11-20', 7)).toBe('#7 · Nov 20')
+  })
+  it('reads as before when there is no number', () => {
+    expect(dailyName('Daily', '2026-11-14', null)).toBe('Daily · Nov 14')
+    expect(dailyName('Daily', '2026-11-14', undefined)).toBe('Daily · Nov 14')
+    expect(dailyName('', '2026-11-14', null)).toBe('Nov 14')
+  })
+})
 
 describe('dayLabel', () => {
   it('prints the calendar day it was given, whatever the time zone', () => {

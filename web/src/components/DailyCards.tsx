@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { getHistoricalDaily, startHistoricalDaily, type HistoricalDaily, type HistoricalSport } from '../api'
-import { countdown, dayLabel } from '../historicalDaily'
+import { countdown, dailyName, dayLabel } from '../historicalDaily'
 import * as copy from '../redraftCopy'
 import { SPORTS } from '../redraftPages'
 import { tmGame } from '../site'
@@ -186,7 +186,7 @@ export default function DailyCards({ daily, status, rollover, starting, onPlay, 
         <span role="status">{rollover ? copy.dailyRollover : ''}</span>
         {rollover ? null : (
           <>
-            {dayLabel(daily[0].date)}: the same season for everyone, from a random draft slot.
+            {daily[0].dailyNumber != null ? dailyName('Daily', daily[0].date, daily[0].dailyNumber, ', ') : dayLabel(daily[0].date)}: the same season for everyone, from a random draft slot.
             {left ? ` Next one in ${left}.` : ''}
           </>
         )}

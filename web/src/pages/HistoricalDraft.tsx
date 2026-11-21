@@ -24,7 +24,7 @@ import { SPORTS, homePageEntry } from '../redraftPages'
 import { tmDaily, tmGame, tmSportIndex } from '../site'
 import { currentSite } from '../siteEnv'
 import { clearDraftQueue } from '../useDraftQueue'
-import { dayLabel, landingStats } from '../historicalDaily'
+import { dailyName, landingStats } from '../historicalDaily'
 import { useUser } from '../user'
 import TimeMachineSignIn from './TimeMachineSignIn'
 
@@ -306,7 +306,7 @@ export default function HistoricalDraft() {
                       {g.chosenSeason && <span className="tm-game-chosen">{copy.chosenPill}</span>}
                       {g.status === 'COMPLETE' && g.draftScore != null && <span className="tm-game-score">Score {g.draftScore}</span>}
                       {g.dailyDate ? (
-                        <span className="tm-game-daily">Daily · {dayLabel(g.dailyDate)}</span>
+                        <span className="tm-game-daily">{dailyName('Daily', g.dailyDate, g.dailyNumber)}</span>
                       ) : (
                         <span className="muted small">{when(g.createdAt)}</span>
                       )}

@@ -190,6 +190,7 @@ describe('Time Machine landing: your numbers and the games list', () => {
       game(1, { draftScore: 88, dailyDate: '2026-11-14' }),
       game(2, { status: 'DRAFTING', finish: null, dailyDate: '2026-11-15' }),
       game(3, { status: 'DRAFTING', finish: null }),
+      game(4, { draftScore: 70, dailyDate: '2026-11-21', dailyNumber: 8 }),
     ])
     renderPage()
     const list = (await screen.findByRole('region', { name: 'Your games' })).querySelector('.tm-games') as HTMLElement
@@ -200,5 +201,7 @@ describe('Time Machine landing: your numbers and the games list', () => {
     expect(within(rows[1]).queryByRole('button', { name: 'Abandon' })).toBeNull()
     expect(within(rows[1]).getByRole('link', { name: 'Resume' })).toBeInTheDocument()
     expect(within(rows[2]).getByRole('button', { name: 'Abandon' })).toBeInTheDocument()
+    // spec 078: a game the server numbered says so
+    expect(within(rows[3]).getByText('Daily #8 · Nov 21')).toBeInTheDocument()
   })
 })

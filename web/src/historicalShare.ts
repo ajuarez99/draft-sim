@@ -1,6 +1,6 @@
 import type { HistoricalGameState, HistoricalResult } from './api'
 import { isOldFormat, ordinal, outcomeHeadline, sportOf } from './historicalCopy'
-import { dayLabel } from './historicalDaily'
+import { dailyName } from './historicalDaily'
 import { brand, shareChosenLine } from './redraftCopy'
 
 /**
@@ -56,8 +56,9 @@ function finishLine(game: HistoricalGameState, result: HistoricalResult): string
  */
 export function shareText(game: HistoricalGameState, result: HistoricalResult, url: string): string {
   const sport = sportOf(game)
-  // A game of the day names its day, so two people comparing know they drafted the same season.
-  const title = game.dailyDate ? `${brand} daily · ${dayLabel(game.dailyDate)}` : brand
+  // A game of the day names its day, so two people comparing know they drafted the same season; its number
+  // (spec 078) makes it a series: "did you do #8?".
+  const title = game.dailyDate ? dailyName(`${brand} daily`, game.dailyDate, game.dailyNumber) : brand
   const lines = [`${title} · ${game.season.label} ${sport}`]
   // Spec 074: a season the player picked is said so, because it does not count toward achievements.
   if (game.chosenSeason) lines.push(shareChosenLine)
